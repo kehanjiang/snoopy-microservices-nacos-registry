@@ -1,0 +1,10 @@
+ext {
+    snoopyGrpcBaseVersion = "1.0.0-RC1"
+    nacosVersion = "1.4.1"
+    library = [
+            //snoopy-grpc-base
+            snoopy_grpc_base: "com.snoopy:snoopy-grpc-base:${snoopyGrpcBaseVersion}",
+            //nacos-client
+            nacos_client   : "com.alibaba.nacos:nacos-client:${nacosVersion}"
+    ]
+}
