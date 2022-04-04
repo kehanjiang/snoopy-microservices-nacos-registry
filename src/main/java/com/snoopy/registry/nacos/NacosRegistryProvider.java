@@ -10,14 +10,9 @@ import com.snoopy.grpc.base.registry.IRegistryProvider;
  */
 public class NacosRegistryProvider implements IRegistryProvider {
     public static final String REGISTRY_PROTOCOL_NACOS = "nacos";
-    private GrpcRegistryProperties grpcRegistryProperties;
-
-    public NacosRegistryProvider(GrpcRegistryProperties grpcRegistryProperties) {
-        this.grpcRegistryProperties = grpcRegistryProperties;
-    }
 
     @Override
-    public IRegistry newRegistryInstance() {
+    public IRegistry newRegistryInstance(GrpcRegistryProperties grpcRegistryProperties) {
         return new NacosRegistry(grpcRegistryProperties);
     }
 
