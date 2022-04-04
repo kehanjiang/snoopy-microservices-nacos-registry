@@ -3,7 +3,6 @@ package com.snoopy.registry.nacos;
 import com.snoopy.grpc.base.configure.GrpcRegistryProperties;
 import com.snoopy.grpc.base.registry.IRegistry;
 import com.snoopy.grpc.base.registry.IRegistryProvider;
-import com.snoopy.grpc.base.registry.nacos.NacosRegistry;
 
 /**
  * @author :   kehanjiang
