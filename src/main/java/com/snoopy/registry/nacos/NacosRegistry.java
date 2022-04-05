@@ -11,7 +11,6 @@ import com.snoopy.grpc.base.configure.GrpcRegistryProperties;
 import com.snoopy.grpc.base.registry.IRegistry;
 import com.snoopy.grpc.base.registry.ISubscribeCallback;
 import com.snoopy.grpc.base.registry.RegistryServiceInfo;
-import com.snoopy.grpc.base.utils.LoggerBaseUtil;
 import org.apache.commons.lang3.math.NumberUtils;
 
 import java.util.Collections;
@@ -37,7 +36,7 @@ public class NacosRegistry implements IRegistry {
         try {
             namingService = NacosFactory.createNamingService(properties);
         } catch (Exception e) {
-            LoggerBaseUtil.error(this, e.getMessage(), e);
+            throw new RuntimeException(e.getMessage(), e);
         }
     }
 
@@ -67,7 +66,7 @@ public class NacosRegistry implements IRegistry {
             };
             namingService.subscribe(serviceInfo.getAlias(), serviceInfo.getNamespace(), this.eventListener);
         } catch (NacosException e) {
-            LoggerBaseUtil.error(this, "[" + serviceInfo.getPath() + "] subscribe failed !", e);
+            throw new RuntimeException("[" + serviceInfo.getPath() + "] subscribe failed !", e);
         } finally {
             reentrantLock.unlock();
         }
@@ -79,7 +78,7 @@ public class NacosRegistry implements IRegistry {
         try {
             namingService.unsubscribe(serviceInfo.getAlias(), serviceInfo.getNamespace(), this.eventListener);
         } catch (NacosException e) {
-            LoggerBaseUtil.error(this, "[" + serviceInfo.getPath() + "] unsubscribe failed !", e);
+            throw new RuntimeException("[" + serviceInfo.getPath() + "] unsubscribe failed !", e);
         } finally {
             reentrantLock.unlock();
         }
@@ -95,9 +94,9 @@ public class NacosRegistry implements IRegistry {
             instance.setPort(serviceInfo.getPort());
             instance.setMetadata(serviceInfo.getParameters());
             instance.setHealthy(true);
-            namingService.registerInstance(serviceInfo.getPath(), serviceInfo.getNamespace(), instance);
+            namingService.registerInstance(serviceInfo.getAlias(), serviceInfo.getNamespace(), instance);
         } catch (NacosException e) {
-            LoggerBaseUtil.error(this, "[" + serviceInfo.getPath() + "] register failed !", e);
+            throw new RuntimeException("[" + serviceInfo.getPath() + "] register failed !", e);
         } finally {
             reentrantLock.unlock();
         }
@@ -110,7 +109,7 @@ public class NacosRegistry implements IRegistry {
         try {
             namingService.deregisterInstance(serviceInfo.getAlias(), serviceInfo.getNamespace(), serviceInfo.getHost(), serviceInfo.getPort());
         } catch (NacosException e) {
-            LoggerBaseUtil.error(this, "[" + serviceInfo.getPath() + "] unregister failed !", e);
+            throw new RuntimeException("[" + serviceInfo.getPath() + "] unregister failed !", e);
         } finally {
             reentrantLock.unlock();
         }
