@@ -13,6 +13,8 @@ import com.snoopy.grpc.base.registry.ISubscribeCallback;
 import com.snoopy.grpc.base.registry.RegistryServiceInfo;
 import org.apache.commons.lang3.math.NumberUtils;
 
+import java.io.IOException;
+import java.rmi.RemoteException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
@@ -115,4 +117,14 @@ public class NacosRegistry implements IRegistry {
         }
     }
 
+    @Override
+    public void close() throws IOException {
+        if (namingService != null) {
+            try {
+                namingService.shutDown();
+            } catch (NacosException e) {
+                throw new RemoteException(e.getErrMsg());
+            }
+        }
+    }
 }
