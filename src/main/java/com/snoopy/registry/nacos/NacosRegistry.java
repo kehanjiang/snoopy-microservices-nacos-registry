@@ -15,9 +15,7 @@ import org.apache.commons.lang3.math.NumberUtils;
 
 import java.io.IOException;
 import java.rmi.RemoteException;
-import java.util.Collections;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
@@ -29,7 +27,7 @@ public class NacosRegistry implements IRegistry {
     private static final long DEFAULT_TIMEOUT = 5_000;
     private long timeout;
     private NamingService namingService;
-    private EventListener eventListener;
+    private Map<String, EventListener> listenerMap = new HashMap<>();
     private final ReentrantLock reentrantLock = new ReentrantLock();
 
     public NacosRegistry(GrpcRegistryProperties grpcRegistryProperties, Properties properties) {
@@ -47,26 +45,30 @@ public class NacosRegistry implements IRegistry {
     public void subscribe(RegistryServiceInfo serviceInfo, ISubscribeCallback subscribeCallback) {
         reentrantLock.lock();
         try {
-            this.eventListener = new EventListener() {
-                @Override
-                public void onEvent(Event event) {
-                    if (event instanceof NamingEvent) {
-                        NamingEvent namingEvent = (NamingEvent) event;
-                        List<Instance> instanceList = namingEvent.getInstances();
-                        List<RegistryServiceInfo> serviceInfoList = instanceList != null ? instanceList.stream().map(instance -> {
-                            return new RegistryServiceInfo(
-                                    serviceInfo.getNamespace(),
-                                    instance.getServiceName(),
-                                    NacosRegistryProvider.REGISTRY_PROTOCOL_NACOS,
-                                    instance.getIp(),
-                                    instance.getPort(),
-                                    instance.getMetadata());
-                        }).collect(Collectors.toList()) : Collections.EMPTY_LIST;
-                        subscribeCallback.handle(serviceInfoList);
+            EventListener eventListener = listenerMap.get(serviceInfo.getPath());
+            if (eventListener == null) {
+                eventListener = new EventListener() {
+                    @Override
+                    public void onEvent(Event event) {
+                        if (event instanceof NamingEvent) {
+                            NamingEvent namingEvent = (NamingEvent) event;
+                            List<Instance> instanceList = namingEvent.getInstances();
+                            List<RegistryServiceInfo> serviceInfoList = instanceList != null ? instanceList.stream().map(instance -> {
+                                return new RegistryServiceInfo(
+                                        serviceInfo.getNamespace(),
+                                        instance.getServiceName(),
+                                        NacosRegistryProvider.REGISTRY_PROTOCOL_NACOS,
+                                        instance.getIp(),
+                                        instance.getPort(),
+                                        instance.getMetadata());
+                            }).collect(Collectors.toList()) : Collections.EMPTY_LIST;
+                            subscribeCallback.handle(serviceInfoList);
+                        }
                     }
-                }
-            };
-            namingService.subscribe(serviceInfo.getAlias(), serviceInfo.getNamespace(), this.eventListener);
+                };
+                listenerMap.put(serviceInfo.getPath(), eventListener);
+            }
+            namingService.subscribe(serviceInfo.getAlias(), serviceInfo.getNamespace(), eventListener);
         } catch (NacosException e) {
             throw new RuntimeException("[" + serviceInfo.getPath() + "] subscribe failed !", e);
         } finally {
@@ -78,7 +80,10 @@ public class NacosRegistry implements IRegistry {
     public void unsubscribe(RegistryServiceInfo serviceInfo) {
         reentrantLock.lock();
         try {
-            namingService.unsubscribe(serviceInfo.getAlias(), serviceInfo.getNamespace(), this.eventListener);
+            EventListener eventListener = listenerMap.get(serviceInfo.getPath());
+            if (eventListener != null) {
+                namingService.unsubscribe(serviceInfo.getAlias(), serviceInfo.getNamespace(), eventListener);
+            }
         } catch (NacosException e) {
             throw new RuntimeException("[" + serviceInfo.getPath() + "] unsubscribe failed !", e);
         } finally {
@@ -90,12 +95,10 @@ public class NacosRegistry implements IRegistry {
     public void register(RegistryServiceInfo serviceInfo) {
         reentrantLock.lock();
         try {
-            Instance instance = new Instance();
-            instance.setServiceName(serviceInfo.getAlias());
-            instance.setIp(serviceInfo.getHost());
-            instance.setPort(serviceInfo.getPort());
-            instance.setMetadata(serviceInfo.getParameters());
-            instance.setHealthy(true);
+            Instance instance = generateInstance(serviceInfo);
+            //先注销
+            namingService.deregisterInstance(serviceInfo.getAlias(), serviceInfo.getNamespace(), instance);
+            //再注册
             namingService.registerInstance(serviceInfo.getAlias(), serviceInfo.getNamespace(), instance);
         } catch (NacosException e) {
             throw new RuntimeException("[" + serviceInfo.getPath() + "] register failed !", e);
@@ -109,7 +112,8 @@ public class NacosRegistry implements IRegistry {
     public void unregister(RegistryServiceInfo serviceInfo) {
         reentrantLock.lock();
         try {
-            namingService.deregisterInstance(serviceInfo.getAlias(), serviceInfo.getNamespace(), serviceInfo.getHost(), serviceInfo.getPort());
+            Instance instance = generateInstance(serviceInfo);
+            namingService.deregisterInstance(serviceInfo.getAlias(), serviceInfo.getNamespace(), instance);
         } catch (NacosException e) {
             throw new RuntimeException("[" + serviceInfo.getPath() + "] unregister failed !", e);
         } finally {
@@ -117,8 +121,19 @@ public class NacosRegistry implements IRegistry {
         }
     }
 
+    private Instance generateInstance(RegistryServiceInfo serviceInfo) {
+        Instance instance = new Instance();
+        instance.setServiceName(serviceInfo.getAlias());
+        instance.setIp(serviceInfo.getHost());
+        instance.setPort(serviceInfo.getPort());
+        instance.setMetadata(serviceInfo.getParameters());
+        instance.setHealthy(true);
+        return instance;
+    }
+
     @Override
     public void close() throws IOException {
+        listenerMap.clear();
         if (namingService != null) {
             try {
                 namingService.shutDown();
