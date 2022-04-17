@@ -95,10 +95,10 @@ public class NacosRegistry implements IRegistry {
     public void register(RegistryServiceInfo serviceInfo) {
         reentrantLock.lock();
         try {
-            Instance instance = generateInstance(serviceInfo);
             //先注销
-            namingService.deregisterInstance(serviceInfo.getAlias(), serviceInfo.getNamespace(), instance);
+            unregister(serviceInfo);
             //再注册
+            Instance instance = generateInstance(serviceInfo);
             namingService.registerInstance(serviceInfo.getAlias(), serviceInfo.getNamespace(), instance);
         } catch (NacosException e) {
             throw new RuntimeException("[" + serviceInfo.getPath() + "] register failed !", e);
