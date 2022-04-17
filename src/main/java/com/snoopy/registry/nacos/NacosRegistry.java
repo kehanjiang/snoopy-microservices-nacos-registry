@@ -83,6 +83,7 @@ public class NacosRegistry implements IRegistry {
             EventListener eventListener = listenerMap.get(serviceInfo.getPath());
             if (eventListener != null) {
                 namingService.unsubscribe(serviceInfo.getAlias(), serviceInfo.getNamespace(), eventListener);
+                listenerMap.remove(serviceInfo.getPath());
             }
         } catch (NacosException e) {
             throw new RuntimeException("[" + serviceInfo.getPath() + "] unsubscribe failed !", e);
